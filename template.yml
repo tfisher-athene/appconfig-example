@@ -1,0 +1,50 @@
+Parameters:
+  ImageVersion:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  DatabaseHost:
+    Type: String
+
+Resources:
+  Application:
+    Type: AWS::AppConfig::Application
+    Properties:
+      Name: TestApplication
+
+  ConfigurationProfile:
+    Type: AWS::AppConfig::ConfigurationProfile
+    Properties:
+      ApplicationId: !Ref Application
+      Name: ConfigProfile
+      LocationUri: hosted
+
+  Configuration:
+    Type: AWS::AppConfig::HostedConfigurationVersion
+    Properties:
+      ApplicationId: !Ref Application
+      ConfigurationProfileId: !Ref ConfigurationProfile
+      Description: Configuration for TestApplication
+      ContentType: text/plain
+      Content: !Sub |
+        EnvironmentName=${EnvironmentName}
+        DatabaseHost=${DatabaseHost}
+
+  ExampleCommand:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/control-m/${EnvironmentName}-Example-Command"
+      Type: String
+      Value: !Sub |
+        aws appconfig get-hosted-configuration-version \
+          --application-id ${Application} \
+          --configuration-profile-id ${ConfigurationProfile} \
+          --version-number ${Configuration} \
+          /dev/stdout | docker run \
+            --rm \
+            --env-file /dev/stdin \
+            -v /home/pyadmin:/home/pyadmin \
+            athenedtr-non-prod.artifactory.onintranet.com/edm/example:${ImageVersion} \
+              --example-flag
